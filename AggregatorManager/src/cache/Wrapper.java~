@@ -1,0 +1,61 @@
+package cache;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+public class Wrapper <Key, Value> {
+    private Map<Key, Value> map;
+    
+    public Wrapper() { 
+       this.map = new LinkedHashMap<Key, Value>();
+    }
+    
+    public void put(Key key, Value value){
+    	synchronized(map){
+    		map.put(key, value);
+    	}
+    }
+    
+    public Value get(Key key){
+    	Value value = null;
+    	synchronized(map){
+    		value = map.get(key);
+    	}
+    	return value;
+    }
+    
+    public Boolean containsKey(Key key){
+    	synchronized(map){
+    		if(map.containsKey(key)){
+    			return true;
+    		}
+    	}
+    	return false;
+    }
+    
+    public Set<Entry<Key, Value>> entrySet(){
+    	Set<Entry<Key, Value>> entry;
+    	synchronized(map){
+    		entry = map.entrySet();
+    	}
+    	return entry;
+    }
+    
+    public void remove(Key key){
+    	synchronized(map){
+    		map.remove(key);
+    	}
+    }
+    
+    public Map<Key, Value> getMap(){
+    	synchronized(map){
+    		return map;
+    	}
+    }
+
+    public void getMap(LinkedHashMap<Key, Value> newMap){
+		map = newMap;
+    }
+}

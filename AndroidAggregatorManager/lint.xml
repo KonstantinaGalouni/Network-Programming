@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <issue id="ButtonStyle">
+        <ignore path="res/layout/activity_monitor.xml" />
+        <ignore path="res/layout/fragment_add.xml" />
+    </issue>
+    <issue id="InflateParams">
+        <ignore path="src/main/java/add/AddFragment.java" />
+        <ignore path="src/main/java/add/AddHistory.java" />
+    </issue>
+</lint>

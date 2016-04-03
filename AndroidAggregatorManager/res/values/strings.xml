@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">AndroidAM</string>
+    <string name="hello">Hello AndroidAM!</string>
+    <string name="action_settings">Settings</string>
+    <string name="hello_world">Hello world1!</string>
+    <string name="sa">Software Agents</string>
+    
+    <string name="hostname">Name</string>
+    <string name="hashKey">HashKey</string>
+    <string name="ip">IP</string>
+    <string name="mac">Mac</string>
+    <string name="status">Status</string>
+    <string name="os">OS</string>
+    <string name="nmap">Nmap V</string>
+    
+    <string name="add">Add Jobs</string>
+    <string name="delete">Delete Jobs</string>
+    <string name="view">View Results</string>
+    <string name="viewAll">View All Results</string>
+    <string name="terminate">Terminate an SA</string>
+    <string name="offline">Server is currently OFFLINE. Please try again later!</string>
+    <string name="title_activity_main">MainActivity</string>
+    
+    <string name="addheading">Add Jobs</string>
+    <string name="number">#</string>
+    <string name="id">ID</string>
+    <string name="jobflags">Flags</string>
+    <string name="jobperiodic">Periodic</string>
+    <string name="jobtime">Time</string>
+    
+	<string name="addlist">Add to list</string>
+	<string name="deletelist">Delete from list</string>
+	<string name="submitlist">Submit list</string>
+	
+	<string name="True">true</string>
+	<string name="False">false</string>
+	<string name="addhistory">Add from History</string>	
+
+	<string name="register">No account? Create One</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+   	<string name="loginBtn">Login</string>
+   	
+   	<string name="logout">Logout</string>
+   	
+   	<string name="newUsername">Username</string>
+    <string name="newPassword">Password</string>
+    <string name="newPasswordConfirm">Confirm Password</string>
+   	<string name="registerBtn">Register</string>
+   	<string name="login">Go back to Login</string>
+	
+   	<string name="idNmapJob">idNmapJob</string>
+    <string name="idJobResult">idJobResult</string>
+    <string name="resultTime">Time</string>
+    <string name="resultHeading">Results</string>
+    <string name="pickNumMsg">Latest Results: </string>
+    <string name="pickNum">number</string>
+    <string name="nmapDetails">Nmap Details</string>
+    
+    <string name="allPickNum">number</string>
+    
+    <string name="flaghint">Enter the flag parameters</string>
+    <string name="timehint">Enter the time (must be an integer)</string>	
+   	
+</resources>

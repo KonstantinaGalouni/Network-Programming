@@ -1,0 +1,346 @@
+package services;
+
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.lang.reflect.Type;
+import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+import cache.Cache;
+import cache.Wrapper;
+import cache.WrapperList;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
+import db.QueriesDB;
+
+
+
+/**
+ * The RESTful Web Services
+ */
+@Path("/services")
+public class Services {
+	
+	/**
+	 * Registers a Software Agent into the database and cache memory.
+	 * 
+	 * @param info {@link RegisterInfo}
+	 * @return a <b>HTTP 200</b> status if successful
+	 */
+	@POST
+	@Path("/register")	
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response register(String info) {
+		Gson gson = new GsonBuilder().create();
+		RegisterInfo regInfo = gson.fromJson(info, RegisterInfo.class);
+		
+		QueriesDB qdb = new QueriesDB();
+		qdb.insertSoftwareAgent(regInfo);
+		
+		String message = "Your software agent with info :\n" 			 	+ 
+						 "\n\t    Hostname : "	+ regInfo.getHostname()	 	+
+						 "\n\t  IP Address : " 	+ regInfo.getIp()		 	+
+						 "\n\t Mac Address : " 	+ regInfo.getMac()		 	+
+						 "\n\t  OS version : " 	+ regInfo.getOsVersion()  	+
+						 "\n\tNmap version : " 	+ regInfo.getNmapVersion() 	+
+						 "\n\t    Hash Key : " 	+ regInfo.getHash()		 	+
+						 "\n\nhas been successfully registered!";
+		
+		return Response.status(200).entity(message).build();
+	}
+	
+		
+	/**
+	 * Checks if the requesting Software Agent has been confirmed.
+	 *
+	 * @param hashKey the Software Agent's hash key
+	 * @return	  
+	 * 	<ul>
+	 * 		<li>a <b>HTTP 202</b> status if accepted</li>
+	 *   	<li>a <b>HTTP 102</b> status if pending </li>
+	 *	 	<li>a <b>HTTP 101</b> status if declined</li>
+	 *	</ul>
+	 */
+	@GET
+	@Path("/acceptance/{hashKey}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response acceptance(@PathParam("hashKey") String hashKey){
+		if(Cache.acceptedMap.containsKey(hashKey)){
+			return Response.status(202).build();		//accepted
+		}else if(Cache.pendingMap.containsKey(hashKey)){
+			return Response.status(102).build();		//pending
+		}else{
+			return Response.status(101).build();		//declined
+		}
+	}	
+
+	/**
+	 * Sends the assigned nmap jobs to the requesting Software Agent.
+	 * <p> The assigned jobs are directly removed from the {@link Cache#addMap}.
+	 * 
+	 * @param hashKey the Software Agent's hash key
+	 * @return a string in <b>JSON</b> format representing the nmap jobs
+	 */
+	@POST
+	@Path("/requestjobs")	
+	@Produces(MediaType.APPLICATION_JSON)
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response requestjobs(String hashKey) {		
+			
+		List<NmapJob> njobs = new ArrayList<>();	
+		QueriesDB qdb = new QueriesDB();
+		Wrapper<String,String[]> jobs = Cache.addMap.get(hashKey);
+		
+		if(jobs != null){			
+			for(Entry<String, String[]> entry : jobs.entrySet()){	
+				String[] job = entry.getValue();
+				NmapJob njob = new NmapJob(Integer.parseInt(job[0])
+														   ,job[1]
+									  ,Boolean.parseBoolean(job[2])
+										  ,Integer.parseInt(job[3]));
+				njobs.add(njob);
+			}						
+			qdb.updateJobs(hashKey);			
+		}
+		
+		Gson gson = new GsonBuilder().create();
+		String result = gson.toJson(njobs);	
+		
+		qdb.updateLastRequest(hashKey);
+		
+		return Response.status(200).entity(result.toString()).build();
+	}
+	
+	/**
+	 * Inserts the sent job results into the database and cache memory.
+	 * <p> The sent results must be in <b>JSON</b> format.
+	 *
+	 * @param res the job results in <b>JSON</b> format
+	 * @return a <b>HTTP 200</b> status if successful
+	 */
+	@POST
+	@Path("/sendresults")	
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response sendresults(String res) {		
+		Gson gson = new GsonBuilder().create();
+		XmlResults results = gson.fromJson(res,XmlResults.class);
+		
+		Date date= new java.util.Date();
+		Timestamp time = new Timestamp(date.getTime());
+		
+		QueriesDB qdb = new QueriesDB();
+		qdb.insertNmapResult(results.getNmapJobId(), results.getXml(), time);
+		System.out.println("took results for "+results.getNmapJobId());
+		return Response.status(200).build();
+	}
+	
+	
+	@GET
+	@Path("/monitor")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response monitor(){
+		Gson gson = new GsonBuilder().create();
+		String result = null;
+		
+		result = gson.toJson(Cache.acceptedMap.getMap()); 
+		return Response.status(200).entity(result).build();
+	}
+		
+	@GET
+	@Path("/history/{hashKey}")
+	@Produces(MediaType.APPLICATION_JSON)
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response history(@PathParam("hashKey") String hashKey){
+		Gson gson = new GsonBuilder().create();
+		String[] results = new String[2];				
+		
+		results[0] = gson.toJson(Cache.onetimeMap.get(hashKey).getMap()); 
+		results[1] = gson.toJson(Cache.periodicMap.get(hashKey).getMap()); 
+				
+		String result = gson.toJson(results);
+		
+		return Response.status(200).entity(result).build();
+	}
+	
+	@POST
+	@Path("/addjobs")	
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response addjobs(String wrapper) {
+		
+		Gson gson = new GsonBuilder().create();
+		Type type = new TypeToken<LinkedHashMap<String, String[]>>(){}.getType();
+		
+		String[] info = gson.fromJson(wrapper, String[].class);
+		String hashKey = gson.fromJson(info[0], String.class);		
+		LinkedHashMap<String, String[]> jobs = gson.fromJson(info[1],type);
+		
+		QueriesDB qdb = new QueriesDB();
+		Wrapper<String, String[]> wrapperJobs = new Wrapper<String, String[]>();
+		wrapperJobs.setMap(jobs);
+		qdb.insertJobs(hashKey, wrapperJobs);
+
+		return Response.status(200).build();
+	}	
+	
+	@GET
+	@Path("/activelist/{hashKey}")
+	@Produces(MediaType.APPLICATION_JSON)
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response periodic(@PathParam("hashKey") String hashKey){
+		Gson gson = new GsonBuilder().create();
+		String result;	
+
+		result = gson.toJson(Cache.activeMap.getMap().get(hashKey)); 
+		return Response.status(200).entity(result).build();
+	}
+	
+	@POST
+	@Path("/deletejob")	
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response deletejob(String wrapper) {
+		
+		Gson gson = new GsonBuilder().create();
+		
+		String[] info = gson.fromJson(wrapper, String[].class);
+		String hashKey = gson.fromJson(info[0], String.class);		
+		String jobid = gson.fromJson(info[1], String.class);
+		
+		QueriesDB qdb = new QueriesDB();
+		qdb.deleteJob(hashKey, jobid);
+
+		return Response.status(200).build();
+	}
+
+	@GET
+	@Path("/terminate/{hashKey}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response terminate(@PathParam("hashKey") String hashKey){
+		QueriesDB qdb = new QueriesDB();
+		qdb.terminateSoftwareAgent(hashKey);
+
+		return Response.status(200).build();
+	}		
+
+	
+	@POST
+	@Path("/androidLogin")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response androidLogin(String info){
+		Gson gson = new GsonBuilder().create();
+		AndroidInfo androidInfo = gson.fromJson(info, AndroidInfo.class);
+		
+		String username = androidInfo.getUsername();
+ 		String password = androidInfo.getPassword();
+ 		String response = "wrongPassword";
+ 		
+		MessageDigest md;
+		byte[] digest;
+		try {
+			md = MessageDigest.getInstance("SHA-256");
+			md.update(password.getBytes("UTF-8"));
+			digest = md.digest();
+
+			if(Cache.acceptedAndroid.containsKey(username) && 
+				Cache.acceptedAndroid.get(username)[1].equals(Arrays.toString(digest))) {
+				response  = "connected";
+			} else if (Cache.pendingAndroid.containsKey(username)) {
+				response  = "pending";
+			} else if (!Cache.acceptedAndroid.containsKey(username)) {
+   	 			response = "wrongUsername";
+   	 		}
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+		
+		return Response.status(200).entity(response).build();
+	}
+	
+	@POST
+	@Path("/androidRegister")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response androidRegister(String info){
+		Gson gson = new GsonBuilder().create();
+		AndroidInfo androidInfo = gson.fromJson(info, AndroidInfo.class);
+
+		QueriesDB qdb = new QueriesDB();
+
+		if(qdb.registerUser(androidInfo.getUsername(), androidInfo.getPassword())) {
+			return Response.status(200).entity("true").build();
+		} else {
+			return Response.status(200).entity("false").build();
+		}
+	}
+	
+	@GET
+	@Path("/results/{hashKey}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response results(@PathParam("hashKey") String hashKey){
+		Gson gson = new GsonBuilder().create();
+		String result = null;
+		
+		result = gson.toJson(Cache.resultMap.get(hashKey).getList()); 
+		return Response.status(200).entity(result).build();
+	}
+
+	@GET
+	@Path("/allresults")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response allresults(){
+		Gson gson = new GsonBuilder().create();
+		String result = null;
+		
+		Map<String, WrapperList> map = Cache.resultMap.getMap();
+    	List<String[]> res = new ArrayList<String[]>();
+    	for(Entry<String, WrapperList> entry : map.entrySet()){
+	    	for (String[] list : entry.getValue().getList()) {
+	    		String[] columnValues = {entry.getKey(), list[0], list[1], list[2]};
+	    		res.add(columnValues);
+	    	}
+    	}
+		
+		result = gson.toJson(res); 
+		return Response.status(200).entity(result).build();
+	}
+	
+	@GET
+	@Path("/details/{idJobResult}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response details(@PathParam("idJobResult") String idJobResult){
+		Gson gson = new GsonBuilder().create();
+		String result = null;
+
+		result = gson.toJson(Cache.xmlMap.get(idJobResult).getList()); 
+		return Response.status(200).entity(result).build();
+	}
+	
+	@GET
+	@Path("/status")
+	public Response details(){		
+		return Response.status(200).build();
+	}
+}
